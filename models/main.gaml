@@ -199,7 +199,7 @@ species road {
 
 species station {
     aspect default {
-        draw sphere(10) color: #blue;
+        draw cube(50) color: #blue;
     }
 }
 
@@ -213,7 +213,7 @@ species waste {
 species crop {
     rgb crop_color <- rgb(76,123,29);
     int crop_id <- int(self);
-    int waste_produced <- 0;
+	int current_nb_waste <- 0 update: length(waste overlapping self);
     
     // Production params
     float waste_prob <- 0.05;
@@ -221,7 +221,10 @@ species crop {
     int base_production_rate <- int(shape.area / 1000) + 1;
     
     reflex produce_waste {
-    	if flip(waste_prob){
+    	// If the crop is filled with waste nothing is produced anymore
+    	bool filled <- current_nb_waste > sqrt(shape.area); // this is very arbitrary
+
+    	if not filled and flip(waste_prob){
     		int amount <- rnd(1, base_production_rate);
     		
     		loop times: amount {
@@ -235,9 +238,7 @@ species crop {
     				create waste {
     					location <- valid_location;
     					targeted <- false;
-    				}
-    				
-    				waste_produced <- waste_produced + 1;    			
+    				}    				
     			}
     		}
     	}
@@ -251,6 +252,12 @@ species crop {
         draw shape color: crop_color border: #black;
         draw string(crop_id) size: 20 color: #black at: location + {0, 0, 5};
     }
+    
+    aspect accumulated_waste_view{
+		draw shape color: crop_color border: #black;
+        draw string(crop_id) size: 20 color: #black at: location + {0, 0, 5};
+    	draw cylinder(ln(current_nb_waste^2), current_nb_waste) color:#red at: shape.centroid;
+    }
 }
 
 species land {
@@ -263,13 +270,15 @@ experiment myExperiment type: gui {
 	parameter "Waste production probability" var: waste_prob min: 0.01 max: 0.2 step: 0.01;
 	parameter "Max distance for waste placement" var: max_distance_from_crop min: 5.0 max: 20.0 step: 1.0;    
     output {
-        display map_3d type: opengl {
+        display map_3d type: 3d axes:false{
+			camera 'default' location: {6200.2021,682.5163,647.0015} target: {3629.78,1492.9672,0.0};
+            species crop aspect: accumulated_waste_view;
             species road;
             species farmer;
             species station;
-            species waste;
+            //species waste;
             species land;
-            species crop aspect: detailed;
         }
     }
 }
+
