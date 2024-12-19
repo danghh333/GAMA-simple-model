@@ -98,7 +98,9 @@ global {
 }
 
 species farmer skills: [moving] {
-    int carried_waste <- 0;
+	
+    list<waste> waste_stack <- [];
+    int carried_waste <- 0 update: length(waste_stack);
     waste target_waste <- nil;
     station target_station <- nil;	
     
@@ -146,9 +148,10 @@ species farmer skills: [moving] {
     reflex collect_waste when: not is_resting and target_waste != nil and location distance_to(target_waste.location) < 10 {
         carried_waste <- carried_waste + 1;
         energy <- energy - 2.0;  // Extra energy cost for collecting
-        ask target_waste {
-            do die;
-        }
+//        ask target_waste {
+//            do die;
+//        }
+        waste_stack <+ target_waste;
         target_waste <- nil;
         write name + " collected waste. Now carrying: " + carried_waste + ", Energy: " + energy;
     }
@@ -158,8 +161,13 @@ species farmer skills: [moving] {
     }
 
     reflex drop_waste when: not is_resting and target_station != nil and location distance_to(target_station.location) < 10 {
+		// Give the wastes to the station
+        loop w over:waste_stack{
+        	target_station.wastes <+ w;
+        	w.location <- target_station.location;
+        }
     	// Reset tracking variables
-        carried_waste <- 0;
+        waste_stack <- [];
         target_station <- nil;
     }
 
@@ -198,8 +206,26 @@ species road {
 }
 
 species station {
+	list<waste> wastes <- [];
+	int nb_waste <- 0 update:length(wastes);
+	
+	reflex transform_waste when:every(300#cycle){
+		loop times:min(10, length(wastes)){
+			let w <- first(wastes);
+			ask w{
+				do die;
+			}
+			remove from:wastes index:0;
+		}
+		
+	}
     aspect default {
         draw cube(50) color: #blue;
+    }
+    
+    aspect detailled {
+	    draw cube(50) color: #blue;
+    	draw cylinder(ln(nb_waste^2), nb_waste) color:#green at: shape.centroid + {30,30,0};
     }
 }
 
@@ -208,6 +234,7 @@ species waste {
     aspect default {
         draw cube(3) color: #red;
     }
+    
 }
 
 species crop {
@@ -272,13 +299,28 @@ experiment myExperiment type: gui {
     output {
         display map_3d type: 3d axes:false{
 			camera 'default' location: {6200.2021,682.5163,647.0015} target: {3629.78,1492.9672,0.0};
-            species crop aspect: accumulated_waste_view;
+            species crop;
             species road;
             species farmer;
             species station;
-            //species waste;
+            species waste;
             species land;
         }
     }
 }
+
+experiment demo type: gui autorun:true{
+	output {
+		layout consoles:false parameters:false;
+        display map_3d type: 3d axes:false{
+			camera 'default' location: {6123.8661,2006.9248,1193.2187} target: {3676.7878,1486.7822,0.0};
+            species crop aspect: accumulated_waste_view;
+            species road;
+            species farmer;
+            species station aspect:detailled;
+            species land;
+        }
+    }
+}
+
 
